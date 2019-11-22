@@ -84,12 +84,17 @@ var fcKernelParams = append(commonVirtioblkKernelRootParams, []Param{
 	{"reboot", "k"},
 	{"panic", "1"},
 	{"iommu", "off"},
+	// {"8250.nr_uarts", "0"},
+//	{"console", "ttyS0"},
 	{"net.ifnames", "0"},
 	{"random.trust_cpu", "on"},
 
 	// Firecracker doesn't support ACPI
 	// Fix kernel error "ACPI BIOS Error (bug)"
 	{"acpi", "off"},
+
+	// Tell agent where to send the logs
+	// {"agent.log_vport", fmt.Sprintf("%d", vSockLogsPort)},
 }...)
 
 func (s vmmState) String() string {
@@ -432,6 +437,28 @@ func (fc *firecracker) fcInit(timeout int) error {
 
 	fc.Logger().WithField("hypervisor args", args).Debug()
 	fc.Logger().WithField("hypervisor cmd", cmd).Debug()
+	fc.Logger().WithField("config.Debug", fc.config.Debug).Debug()
+	fc.Logger().WithField("stateful", fc.stateful).Debug()
+	/*
+	stdout, _ := cmd.StdoutPipe()
+	stderr, _ := cmd.StderrPipe()
+//	stdin, _ := cmd.StdinPipe()
+	// create a file to get log from kernel
+	f, _ := os.Create("/tmp/fc-kernel.log")
+
+	go func() {
+		io.Copy(f, stdout)
+	}()
+
+	go func() {
+		io.Copy(f, stderr)
+	}()
+
+//	go func() {
+//		io.Copy(stdin, os.Stdin)
+//	}()
+*/
+
 	if err := cmd.Start(); err != nil {
 		fc.Logger().WithField("Error starting firecracker", err).Debug()
 		return err

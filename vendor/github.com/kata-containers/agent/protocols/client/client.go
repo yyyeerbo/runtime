@@ -15,15 +15,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grpc-ecosystem/grpc-opentracing/go/otgrpc"
+//	"github.com/grpc-ecosystem/grpc-opentracing/go/otgrpc"
 	"github.com/hashicorp/yamux"
 	"github.com/mdlayher/vsock"
-	opentracing "github.com/opentracing/opentracing-go"
-	"google.golang.org/grpc"
+//	opentracing "github.com/opentracing/opentracing-go"
+//	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
 	agentgrpc "github.com/kata-containers/agent/protocols/grpc"
+	"github.com/containerd/ttrpc"
 )
 
 const (
@@ -39,9 +40,9 @@ var hybridVSockPort uint32
 
 // AgentClient is an agent gRPC client connection wrapper for agentgrpc.AgentServiceClient
 type AgentClient struct {
-	agentgrpc.AgentServiceClient
-	agentgrpc.HealthClient
-	conn *grpc.ClientConn
+	AgentServiceClient agentgrpc.AgentServiceService
+	HealthClient agentgrpc.HealthService
+	conn *ttrpc.Client
 }
 
 type yamuxSessionStream struct {
@@ -88,6 +89,15 @@ func NewAgentClient(ctx context.Context, sock string, enableYamux bool) (*AgentC
 	if err != nil {
 		return nil, err
 	}
+
+	var conn net.Conn
+	var d dialer
+	d = agentDialer(parsedAddr, enableYamux)
+	conn, err = d(grpcAddr, defaultDialTimeout)
+	if err != nil {
+		return nil, err
+	}
+	/*
 	dialOpts := []grpc.DialOption{grpc.WithInsecure(), grpc.WithBlock()}
 	dialOpts = append(dialOpts, grpc.WithDialer(agentDialer(parsedAddr, enableYamux)))
 
@@ -111,11 +121,14 @@ func NewAgentClient(ctx context.Context, sock string, enableYamux bool) (*AgentC
 	if err != nil {
 		return nil, err
 	}
+	*/
+
+	client := ttrpc.NewClient(conn)
 
 	return &AgentClient{
-		AgentServiceClient: agentgrpc.NewAgentServiceClient(conn),
-		HealthClient:       agentgrpc.NewHealthClient(conn),
-		conn:               conn,
+		AgentServiceClient: agentgrpc.NewAgentServiceClient(client),
+		HealthClient:       agentgrpc.NewHealthClient(client),
+		conn:               client,
 	}, nil
 }
 
@@ -407,13 +420,16 @@ func HybridVSockDialer(sock string, timeout time.Duration) (net.Conn, error) {
 			return nil, err
 		}
 
+		// don't know how grpc works
+		// ttrpc has no EOT, I think
+		// fmt.Println("ttrpc")
 		// Read EOT (End of transmission) byte
-		eot := make([]byte, 32)
-		if _, err = conn.Read(eot); err != nil {
+		// eot := make([]byte, 32)
+		// if _, err = conn.Read(eot); err != nil {
 			// Just close the connection, gRPC will dial again
 			// without errors
-			conn.Close()
-		}
+			// conn.Close()
+		// }
 
 		return conn, nil
 	}
